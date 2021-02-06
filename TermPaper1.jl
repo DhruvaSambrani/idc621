@@ -667,7 +667,7 @@ md"""# References
 [^pluto]: Pluto - Reactive Notebooks for Julia. Fons van der Plas and Mikołaj Bochenski. [https://github.com/fonsp/Pluto.jl](https://github.com/fonsp/Pluto.jl)
 [^plutoui]: PlutoUI. Fons van der Plas. [https://github.com/fonsp/PlutoUI.jl](https://github.com/fonsp/PlutoUI.jl)
 [^stats]: Statistics - Julia stdlib for Statistics. [https://docs.julialang.org/en/v1/stdlib/Statistics/](https://docs.julialang.org/en/v1/stdlib/Statistics/)
-[^cellularbase]: CellularBase.jl: Abstract definitions for Cellular Automaton. Dhruva Sambrani. [https://dhruvasambrani.github.io/idc631/CellularBase](https://dhruvasambrani.github.io/idc631/CellularBase)
+[^cellularbase]: CellularBase.jl: Abstract definitions for Cellular Automaton. Dhruva Sambrani. [https://dhruvasambrani.github.io/idc621/CellularBase](https://dhruvasambrani.github.io/idc621/CellularBase)
 """
 
 # ╔═╡ Cell order:

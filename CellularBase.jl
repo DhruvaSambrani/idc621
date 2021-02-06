@@ -104,10 +104,10 @@ function state!(grid::AbstractGrid{T}, newstate)::Nothing  where {T}
 	return nothing
 end
 boundary_conditions(grid::AbstractGrid)::BoundaryCondition = grid.bc
+neighborhood(grid::AbstractGrid)::Array{CartesianIndex} = cartesians(grid.neighborhood)
 function possible_states(grid::AbstractGrid{T})::Array{T} where {T}
 	grid.possible_states
 end
-neighborhood(grid::AbstractGrid)::Array{CartesianIndex} = cartesians(grid.neighborhood)
 function newstate(grid::AbstractGrid{T})::Array{T} where {T} 
 	@warn "Possible unspecialized Call"
 	similar(state(grid))
@@ -115,15 +115,6 @@ end
 function neighbors(grid::AbstractGrid{T}, i::CartesianIndex)::Array{T} where {T}
     neighborindex = neighborhood(grid) .|> x -> x + i
 	grid[neighborindex]
-end
-
-function evolve!(grid::AbstractGrid{T}; kwargs...)::Nothing where {T}
-    _newstate = newstate(grid)
-    Threads.@threads for i in CartesianIndices(grid)
-        _newstate[i] = grid(neighbors(grid, i); kwargs...)
-	end
-	state!(grid, _newstate)
-	return nothing
 end
 
 Base.ndims(grid::AbstractGrid) = ndims(state(grid))
@@ -136,6 +127,15 @@ function Base.getindex(grid::AbstractGrid{T}, is::Int...)::T where T
 	grid[CartesianIndex(is)]
 end
 Base.CartesianIndices(grid::AbstractGrid)::CartesianIndices = CartesianIndices(state(grid))
+
+function evolve!(grid::AbstractGrid{T}; kwargs...)::Nothing where {T}
+    _newstate = newstate(grid)
+    Threads.@threads for i in CartesianIndices(grid)
+        _newstate[i] = grid(neighbors(grid, i); kwargs...)
+	end
+	state!(grid, _newstate)
+	return nothing
+end
 
 function tabular_evolution!(grid::AbstractGrid, table::Dict)::Nothing
     newstate = newstate(grid)
@@ -157,10 +157,14 @@ function simulate!(grid::AbstractGrid{T}, steps::Int; store_results=true, postru
 		if (!ss) evolve!(grid; kwargs...) end
 		if store_results push!(results, copy(state(grid))) end
 		if !isnothing(postrunhook)
-			ss = postrunhook(grid, step; kwargs...) == :shortcurcuit
+			message = postrunhook(grid, step; kwargs...)
+			ss = message == :shortcurcuit
+			if message == :interrupt
+				break
+			end
 		end
 	end
-	results
+	if store_results results else nothing end
 end
 
 end
