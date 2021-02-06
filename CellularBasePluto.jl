@@ -7,6 +7,12 @@ using InteractiveUtils
 # ╔═╡ fe6fc4e0-688c-11eb-3cba-fbadc8c45088
 using Plots
 
+# ╔═╡ b3150b20-68a7-11eb-0c1c-1389cd8227ec
+html"""<center><h1 style="font-size: 3.5rem">CellularBase docs<h1></center><br>"""
+
+# ╔═╡ ec8999c0-68a7-11eb-02dd-dfb6f5672595
+md"This is the documentation of [CellularBase.jl](https://github.com/DhruvaSambrani/idc621/blob/main/CellularBase.jl)"
+
 # ╔═╡ 37e3fad0-688c-11eb-0760-991b2ada6775
 md"# Boundary Conditions
 
@@ -288,6 +294,8 @@ function simulate!(grid::AbstractGrid{T}, steps::Int; store_results=true, postru
 end
 
 # ╔═╡ Cell order:
+# ╟─b3150b20-68a7-11eb-0c1c-1389cd8227ec
+# ╟─ec8999c0-68a7-11eb-02dd-dfb6f5672595
 # ╠═fe6fc4e0-688c-11eb-3cba-fbadc8c45088
 # ╟─37e3fad0-688c-11eb-0760-991b2ada6775
 # ╠═29996140-688c-11eb-1317-6d36dc7fe265
