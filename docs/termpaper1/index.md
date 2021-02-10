@@ -13,9 +13,3 @@ The submission folder contains the following files -
 5. [termpaper1.html](termpaper1.html) - The final static paper to be evaluated
 
 Julia programming language was used. Instructions for running code can be found in the [GitHub repository](https://github.com/DhruvaSambrani/idc621).
-
-Thanks and Regards,
-
-Dhruva Sambrani
-
-MS18163
