@@ -15,5 +15,7 @@ The submission folder contains the following files -
 Julia programming language was used. Instructions for running code can be found in the [GitHub repository](https://github.com/DhruvaSambrani/idc621).
 
 Thanks and Regards,
+
 Dhruva Sambrani
+
 MS18163
