@@ -146,14 +146,15 @@ function tabular_evolution!(grid::AbstractGrid, table::Dict)::Nothing
 	return nothing
 end
 
-function simulate!(grid::AbstractGrid{T}, steps::Int; store_results=true, postrunhook=nothing, kwargs...)::Array{Array{T}}  where {T}
+function simulate!(grid::AbstractGrid{T}, max_steps::Int; store_results=true, postrunhook=nothing, kwargs...)::Array{Array{T}}  where {T}
 	if store_results results = Array{T}[] end
 	push!(results, copy(state(grid)))
 	if !isnothing(postrunhook) 
-		postrunhook(grid, step; kwargs...)
+		postrunhook(grid, 0; kwargs...)
 	end
 	ss = false
-	for step in 1:steps
+	step = 1
+	while step < max_steps
 		if (!ss) evolve!(grid; kwargs...) end
 		if store_results push!(results, copy(state(grid))) end
 		if !isnothing(postrunhook)
