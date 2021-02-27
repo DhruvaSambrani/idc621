@@ -1,8 +1,8 @@
-# Term Paper 1 Submission
+# Term Paper 2 Submission
 
 Thank you for teaching and evaluating the course.
 
-This is the Term Paper 1 submission for IDC621 for the Spring Semester 2021.
+This is the Term Paper 2 submission for IDC621 for the Spring Semester 2021.
 
 The submission folder contains the following files -
 
