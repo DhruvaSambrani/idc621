@@ -1,43 +1,33 @@
-#%%
+# %%
 push!(LOAD_PATH, ".");
-#%%
-using CellularBase
-using Plots
-#%%
-mutable struct SandPile<:AbstractGrid{Int}
-    state::Array{Int, 2}
-    otherstate::Array{Int, 2}
-    h_c::Int
+# %%
+@time using CellularBase
+#@time using Plots
+#@time using LsqFit
+@time using Random
+# %%
+mutable struct SandPile <: AbstractGrid{Int8, 2}
+    state::Array{Int8,2}
+    h_c::Int8
     neighborhood::AbstractNeighborhood
     bc::BoundaryCondition
-    function SandPile(state::Array{Int, 2}, h_c::Int)
-        new(state, copy(state), h_c, VonNeumannNeighborhood(1,2), FixedMin)
+    function SandPile(state::Array{Int8,2}, h_c::Int8)
+        new(state, h_c, VonNeumannNeighborhood(1, 2), FixedMin)
     end
 end
 
 CellularBase.possible_states(sp::SandPile) = 0:sp.h_c
 
-CellularBase.newstate(grid::SandPile) = grid.otherstate;
-function CellularBase.state!(grid::SandPile, newstate)
-    grid.otherstate = grid.state
-    grid.state = newstate
+@inline iscritical(val::Int8, g::SandPile) = val >= g.h_c
+@inline iscritical(g::SandPile) = p -> iscritical(p, g)
+
+function (_g::SandPile)(current::Int8, neighbors::Array{Int8}; kwargs...)
+    h = iscritical(_g)
+    if h(current) kwargs[:topple][end] += 1 end
+    return current + (h(current) ? -4 : 0) + count(h, neighbors)
 end
 
-iscritical(val::Int, g::SandPile) = val >= g.h_c
-iscritical(g::SandPile) = p -> iscritical(p, g)
-
-function (_g::SandPile)(neighbors::Array{Int}; kwargs...)
-    current = neighbors[1]
-    retval = current
-    if iscritical(current, _g)
-        retval -= _g.h_c
-        kwargs[:topple][end] += 1
-    end
-    retval += count(iscritical(_g), neighbors[2:end])
-    return retval
-end
-
-function ready_next(grid::SandPile, step::Int; topple::Array{Int}, max_steps)
+function ready_next(grid::SandPile, step::Int; topple::Array{Int64}, max_steps)
     if count(iscritical(grid), state(grid)) == 0
         # No critical left
         if length(topple) == max_steps
@@ -45,40 +35,61 @@ function ready_next(grid::SandPile, step::Int; topple::Array{Int}, max_steps)
             return :interrupt
         else
             # Moar, moar, MOAR!
-            # xrand, yrand = rand.(Base.OneTo.(size(grid)))
-            xrand, yrand = 5,5
+            xrand, yrand = rand.(Base.OneTo.(size(grid)))
             # Potentially destabilize - HAHAHAA
             grid.state[xrand, yrand] += 1
             # Make new counter
             push!(topple, 0)
         end
     end
+    return :continue
 end
-#%%
-h_c = 4
-topple_count = Int[]
-linear(i,j) = trunc(Int, (h_c-1)*(1 - √(i^2+j^2)/√50))
+# %%
+Random.seed!(0)
+h_c = Int8(4)
+topple_count = Int[0]
+w = 20
+rand_arr = rand(Int8.(1:h_c-1), w, w)
+zero_arr = zeros(Int8, w, w)
 
-arr = [linear(5-i,5-j) for i in 1:9, j in 1:9]
+grid = SandPile(rand_arr, h_c)
+@time simulate!(
+    grid, typemax(Int), 
+    postrunhook=ready_next, topple=topple_count,
+    max_steps=100_000, store_results=false);
 
-grid = SandPile(zeros(Int, 9,9), h_c)
-simulate!(grid, typemax(Int), postrunhook=ready_next, topple=topple_count, max_steps=1000)
-
-topple_freq = freqtable(topple_count)
-
-plot(keys(topple_freq), values(topple_freq))
-#=
-#%%
-anim = @animate for frame ∈ results
-    wireframe(frame, zlims=(0,4))
-end
-gif(anim, fps=30)
-#%%=#
+# %%
 
 function freqtable(k::Array{T}) where T
-    d = Dict{T, Int}()
+    d = Dict{T,Int}()
     for i ∈ k
         d[i] = get(d, i, 0) + 1
     end
     return d
 end
+
+
+topple_freq = freqtable(topple_count)
+
+topple_freq = filter!((p) -> p[1] * p[2] != 0, topple_freq)
+
+x = log.(keys(topple_freq))
+y = log.(values(topple_freq))
+
+plot(x,y, st=:scatter)
+# %%
+@. model(x, p) = p[1] * x + p[2]
+fit = curve_fit(model, x, y, [0.,0.])
+println(fit.param)
+xp = 0:0.01:maximum(x)
+yp = model(xp, fit.param)
+plot!(xp, yp)
+
+# %%
+#=
+anim = @animate for frame ∈ results
+    wireframe(frame, zlims=(0,4))
+end
+gif(anim, fps=30)
+=#
+#%%

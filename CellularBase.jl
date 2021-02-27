@@ -1,48 +1,53 @@
 module CellularBase
-import Base: getindex, ndims, size, CartesianIndices, show
-import Markdown: parse
+import Base: getindex, ndims, size, CartesianIndices, show, eltype
+import Markdown:parse
 
 export BoundaryCondition, Periodic, FixedMax, FixedMin, Clamp, boundary_conditions,
 		AbstractNeighborhood, VonNeumannNeighborhood, MooreNeighborhood,
 		radius, cartesians, neighborhood,
 		AbstractGrid, state, state!, possible_states, newstate,
-		tabular_evolution!, simulate!
+		evolve!, tabular_evolution!, simulate!
 
-@enum BoundaryCondition Periodic FixedMin FixedMax Clamp
+abstract type BoundaryCondition end
+struct Periodic <: BoundaryCondition end
+struct FixedMin <: BoundaryCondition end
+struct FixedMax <: BoundaryCondition end
+struct Clamp <: BoundaryCondition end 
 
 # Neighborhoods
-abstract type AbstractNeighborhood end
+abstract type AbstractNeighborhood{N} end
 radius(neighborhood::AbstractNeighborhood) = neighborhood.radius
-cartesians(neighborhood::AbstractNeighborhood) = neighborhood.cartesians
+function cartesians(neighborhood::AbstractNeighborhood{N})::Array{CartesianIndex{N},1} where N
+	neighborhood.cartesians
+end
+(dimensions(::AbstractNeighborhood{N}) where N) = N
 
-struct VonNeumannNeighborhood <: AbstractNeighborhood
-	cartesians::Array{CartesianIndex}
+struct VonNeumannNeighborhood{N} <: AbstractNeighborhood{N}
+	cartesians::Array{CartesianIndex{N},1}
 	radius::Int
-	dimensions::Int
-	function VonNeumannNeighborhood(radius::Int, dimensions::Int)::VonNeumannNeighborhood
-		arr = CartesianIndex[CartesianIndex(Tuple(zeros(Int, dimensions)))]
+	function VonNeumannNeighborhood{T}(radius::Int) where T
+		arr = CartesianIndex[]
 		for i in 1:radius
-			for j in 1:dimensions
-				zs = zeros(Int, dimensions)
+			for j in 1:T
+				zs = zeros(Int, T)
 				zs[j] = i
 				push!(arr, CartesianIndex(Tuple(zs)))
 				zs[j] = -i
 				push!(arr, CartesianIndex(Tuple(zs)))
 			end
 		end
-		new(arr, radius, dimensions)
+		new(arr, radius)
 	end
 end
 
-struct MooreNeighborhood <: AbstractNeighborhood
-	cartesians::Array{CartesianIndex}
+struct MooreNeighborhood{N} <: AbstractNeighborhood{N}
+	cartesians::Array{CartesianIndex{N},1}
 	radius::Int
-	dimensions::Int
-	function MooreNeighborhood(radius::Int, dimensions::Int)::MooreNeighborhood
+	function MooreNeighborhood{T}(radius::Int) where T
 		new(
 			CartesianIndices(Tuple(-radius:radius for _ in 1:dimensions)) |>
 			x -> reshape(x, :),
-			radius, dimensions
+			radius
 		)
 	end
 end
@@ -58,28 +63,39 @@ function Base.show(io::IO, ::MIME"text/html", neighborhood::AbstractNeighborhood
 end
 
 # Grids
-abstract type AbstractGrid{T} end
+abstract type AbstractGrid{T,N} <: AbstractArray{T,N} end
 
-function Base.getindex(grid::AbstractGrid{T}, index::CartesianIndex)::T where {T}
-    try
-        state(grid)[index]
-    catch
-        if boundary_conditions(grid) == Periodic
-            grid[CartesianIndex(mod1.(Tuple(index), size(grid)))]
-        elseif boundary_conditions(grid) == FixedMax
-            maximum(possible_states(grid))
-        elseif boundary_conditions(grid) == FixedMin
-            minimum(possible_states(grid))
-        else
-            grid[
-                CartesianIndex(
-                    Tuple(
-                        clamp(Tuple(index)[i], 1, size(grid)[i]) 
-                        for i in 1:ndims(grid)
-                    )
-                )
-            ]
-        end
+function Base.eltype(::Type{AbstractGrid{T,N}}) where {T,N}
+	return T
+end
+(Base.ndims(grid::AbstractGrid{T,N}) where {T,N}) = N
+Base.size(grid::AbstractGrid) = size(state(grid))
+Base.IndexStyle(::Type{AbstractGrid}) = Base.IndexCartesian
+
+function wrap(::Periodic, grid::AbstractGrid{T,N}, index::CartesianIndex{N})::T where {T,N}
+	@inbounds grid[CartesianIndex(mod1.(Tuple(index), size(grid)))]
+end
+function wrap(::FixedMax, grid::AbstractGrid{T,N}, index::CartesianIndex{N})::T where {T,N}
+	maximum(possible_states(grid))
+end
+function wrap(::FixedMin, grid::AbstractGrid{T,N}, index::CartesianIndex{N})::T where {T,N}
+	minimum(possible_states(grid))
+end
+function wrap(::Clamp, grid::AbstractGrid{T,N}, index::CartesianIndex{N})::T where {T,N}
+	@inbounds grid[
+		CartesianIndex(
+			Tuple(
+				clamp(Tuple(index)[i], 1, size(grid)[i]) 
+				for i in 1:ndims(grid)
+			)
+		)
+	]
+end
+@inline function Base.getindex(grid::AbstractGrid{T,N}, index::CartesianIndex{N})::T where {T,N}
+    if checkbounds(Bool, grid, index)
+       	@inbounds state(grid)[index]
+	else
+        wrap(boundary_conditions(grid), grid, index)
     end
 end
 
@@ -94,50 +110,38 @@ function Base.show(io::IO, ::MIME"text/html", grid::AbstractGrid)
 	)
 end
 
-function state(grid::AbstractGrid{T})::Array{T} where {T} 
+function state(grid::AbstractGrid{T,N})::Array{T,N} where {T,N}
 	grid.state
 end
 
-function state!(grid::AbstractGrid{T}, newstate)::Nothing  where {T}
-	@warn "Possible unspecialized Call"
+function state!(grid::AbstractGrid, newstate)::Nothing
 	grid.state = newstate
 	return nothing
 end
 boundary_conditions(grid::AbstractGrid)::BoundaryCondition = grid.bc
-neighborhood(grid::AbstractGrid)::Array{CartesianIndex} = cartesians(grid.neighborhood)
-function possible_states(grid::AbstractGrid{T})::Array{T} where {T}
+(neighborhood(grid::AbstractGrid{T,N})::Array{CartesianIndex{N},1}) where {T,N} = cartesians(grid.neighborhood)
+function possible_states(grid::AbstractGrid{T,N})::Array{T,1} where {T,N}
 	grid.possible_states
 end
-function newstate(grid::AbstractGrid{T})::Array{T} where {T} 
-	@warn "Possible unspecialized Call"
+function newstate(grid::AbstractGrid{T,N})::Array{T,N} where {T,N}
 	similar(state(grid))
 end
-function neighbors(grid::AbstractGrid{T}, i::CartesianIndex)::Array{T} where {T}
-    neighborindex = neighborhood(grid) .|> x -> x + i
-	grid[neighborindex]
+function neighbors(grid::AbstractGrid{T,N}, i::CartesianIndex{N})::Array{T,1} where {T,N}
+    map(neighborhood(grid)) do ind 
+		grid[ind + i]
+	end
 end
 
-Base.ndims(grid::AbstractGrid) = ndims(state(grid))
-Base.size(grid::AbstractGrid) = size(state(grid))
-function Base.getindex(grid::AbstractGrid{T}, indexs::Union{Array{Int},Array{CartesianIndex{N}}})::Array{T} where {T,N}
-	indexs .|> i -> grid[i]
-end
-
-function Base.getindex(grid::AbstractGrid{T}, is::Int...)::T where T
-	grid[CartesianIndex(is)]
-end
-Base.CartesianIndices(grid::AbstractGrid)::CartesianIndices = CartesianIndices(state(grid))
-
-function evolve!(grid::AbstractGrid{T}; kwargs...)::Nothing where {T}
+function evolve!(grid::AbstractGrid{T,N}; kwargs...)::Nothing where {T,N}
     _newstate = newstate(grid)
-    Threads.@threads for i in CartesianIndices(grid)
-        _newstate[i] = grid(neighbors(grid, i); kwargs...)
+    for i in eachindex(grid)
+        _newstate[i] = grid(grid[i], neighbors(grid, i); kwargs...)
 	end
 	state!(grid, _newstate)
 	return nothing
 end
 
-function tabular_evolution!(grid::AbstractGrid, table::Dict)::Nothing
+function tabular_evolution!(grid::AbstractGrid, table::Dict)
     newstate = newstate(grid)
     for i in CartesianIndices(grid)
         newstate[i] = table[grid(neighbors(grid, i))]
@@ -146,26 +150,28 @@ function tabular_evolution!(grid::AbstractGrid, table::Dict)::Nothing
 	return nothing
 end
 
-function simulate!(grid::AbstractGrid{T}, max_steps::Int; store_results=true, postrunhook=nothing, kwargs...)::Array{Array{T}}  where {T}
-	if store_results results = Array{T}[] end
-	push!(results, copy(state(grid)))
-	if !isnothing(postrunhook) 
-		postrunhook(grid, 0; kwargs...)
+function simulate!(grid::AbstractGrid{T,N}, max_steps::Int; store_results=true, postrunhook=nothing, kwargs...) where {T,N}
+	if store_results 
+		results = Array{T,N}[] 
+		push!(results, copy(state(grid)))
 	end
+	if isnothing(postrunhook) 
+		postrunhook = (grid, step; kwargs...) -> true
+	end
+	postrunhook(grid, 0; kwargs...)
 	ss = false
-	step = 1
+	step = 0
 	while step < max_steps
 		if (!ss) evolve!(grid; kwargs...) end
 		if store_results push!(results, copy(state(grid))) end
-		if !isnothing(postrunhook)
-			message = postrunhook(grid, step; kwargs...)
-			ss = message == :shortcurcuit
-			if message == :interrupt
-				break
-			end
+		message = postrunhook(grid, step; kwargs...)
+		ss = message == :shortcurcuit
+		if message == :interrupt
+			break
 		end
+		step += 1
 	end
-	if store_results results else nothing end
+	if store_results results else Array{T,N}[] end
 end
 
 end
