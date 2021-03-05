@@ -2,9 +2,7 @@
 
 Thank you for teaching and evaluating the course.
 
-This is the Term Paper 2 submission for IDC621 for the Spring Semester 2021.
-
-The submission folder contains the following files -
+This is the Term Paper 2 submission for IDC621 for the Spring Semester 2021 for MS18163.
 
 ## Files to be evaluated
 
