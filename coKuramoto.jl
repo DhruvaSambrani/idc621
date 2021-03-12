@@ -46,6 +46,7 @@ end
 zs = graph(κs, σs)
 # %%
 plotlyjs()
-plot(σs, κs, zs, st=:surface, zlims=(0, 1), xlabel="Sigma", ylabel="Kappa", zlabel="r_inf")
+plot(σs, κs, zs, st=:surface, zlims=(0, 1), xlabel="Sigma", ylabel="Kappa", zlabel="r_inf", title="R∞(σ, κ)")
+savefig("ksr")
 # %%
 plot(abs.(simulate(Int(1e5), 500, 1., 0., 1e-4)))
