@@ -3,7 +3,6 @@ using Statistics
 using JLD
 
 println("imported")
-
 # %%
 mutable struct Agent
     R::Float64
@@ -30,22 +29,19 @@ function simulate(steps::Int, n::Int, σ::Float64, κ::Float64, dt::Float64)
     means
 end
 
-function graph(κs, σs)
+function graph(κs::Array{Float64}, σs::Array{Float64})
     arr = zeros(Float64, length(κs), length(σs))
-    Threads.@threads for (i, κ) in enumerate(κs), (j, σ) in enumerate(σs)
-        println(κ, " ", σ)
-        arr[i,j] = mean(abs, simulate(Int(1e5), 1000, σ, κ, 1e-4)[end - 1000:end])
+    for (i, κ) in enumerate(κs), (j, σ) in enumerate(σs)
+        arr[i,j] = mean(
+                abs, 
+                @view simulate(Int(1e5), 1000, σ, κ, 1e-4)[end - 1000:end]
+	)
     end
     arr
 end
 # %%
-κs, σs = 0:0.1:2, 0:0.1:2
+κs, σs = collect(0.0:0.1:2.5), collect(0.0:0.1:2.5)
 zs = graph(κs, σs)
 # %%
 save("save.jld", "zs", zs, "ks", κs, "ss", σs)
-# %%
-plot(σs, κs, zs, st=:wireframe, zlims=(0, 1), xlabel="Sigma", ylabel="Kappa", zlabel="r_inf", title="R∞(σ, κ)")
-# savefig("ksr")
-# %%
-m = simulate(Int(1e5), 1000, 1., 1., 5e-4);
-plot(abs.(m))
+
