@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.12.21
+# v0.14.2
 
 using Markdown
 using InteractiveUtils
@@ -70,34 +70,6 @@ md"### Define `LifeGrid`"
 # ╔═╡ 038cbdf2-6880-11eb-1b2b-2b4c4974be49
 md"""This is the basic structure that defines all the parameters of a particular "grid". The name `LifeGrid` was given by mistake but was not changed as it would entail too many other changes"""
 
-# ╔═╡ 35d0be40-66f7-11eb-2f60-01982265ccb0
-mutable struct LifeGrid <: AbstractGrid{Int}
-	state::Array{Int}
-	otherstate::Array{Int}
-	bc::BoundaryCondition
-	neighborhood::AbstractNeighborhood
-	τi::Int64
-	τr::Int64
-	max::Int64
-	function LifeGrid(
-			size::Tuple{Int,Int}, τi::Int, τr::Int;
-			max::Int64, init=nothing, 
-			nh::AbstractNeighborhood=VonNeumannNeighborhood(1, 2))
-		z = zeros(size)
-		if isnothing(init) z[(size .÷ 2)...] = 1
-		else z[rand(CartesianIndices(z), init)] .= 1
-		end
-		new(z, copy(z), FixedMax, nh, τi, τr, max)
-	end
-	function LifeGrid(
-			arr::Array{Int}, τi::Int, τr::Int;
-			max::Int64,
-			nh::AbstractNeighborhood=VonNeumannNeighborhood(1, 2)
-		)
-		new(arr, copy(arr), FixedMax, nh, τi, τr, max)
-	end
-end
-
 # ╔═╡ 91afcec0-66f9-11eb-37b1-f78de5e0ba8a
 md"### Define method of evolution"
 
@@ -127,29 +99,6 @@ md"States are defined in the following way
 3. Refactory $\implies i \in [\tau_i + 1, \tau_i+\tau_r]$
 4. Recovered $\implies i = (\tau_i+\tau_r + 1)$
 "
-
-# ╔═╡ 21d1eb20-66f8-11eb-26d3-4fb244ca8646
-begin
-	infect(_count::Int64, g::LifeGrid) = if (_count == 0) false else rand() < 1 / g.max * _count end
-	susceptible(i::Int, g::LifeGrid) = i == 0
-	infectious(i::Int, g::LifeGrid) = i ∈ 1:g.τi
-	refactory(i::Int, g::LifeGrid) = i ∈ (g.τi + 1):(g.τr + g.τi)
-	recovered(i::Int, g::LifeGrid) = i == (g.τr + g.τi) + 1
-end
-
-# ╔═╡ 263db440-66f9-11eb-03b5-1fce784fad2d
-function (_g::LifeGrid)(neighbors::Array{Int}; kwargs...)
-	current = neighbors[1]
-	if susceptible(current, _g)
-		if infect(count(i -> infectious(i, _g), neighbors), _g)
-			return 1
-		else
-			return 0
-		end
-	else
-		return (current + 1) % (_g.τi + _g.τr)
-	end
-end
 
 # ╔═╡ de865ed2-66f9-11eb-31dc-c782d4338af3
 md"### Define helper `functions`"
@@ -669,6 +618,57 @@ md"""# References
 [^stats]: Statistics - Julia stdlib for Statistics. [https://docs.julialang.org/en/v1/stdlib/Statistics/](https://docs.julialang.org/en/v1/stdlib/Statistics/)
 [^cellularbase]: CellularBase.jl: Abstract definitions for Cellular Automaton. Dhruva Sambrani. [https://dhruvasambrani.github.io/idc621/CellularBase](https://dhruvasambrani.github.io/idc621/CellularBase)
 """
+
+# ╔═╡ 263db440-66f9-11eb-03b5-1fce784fad2d
+function (_g::LifeGrid)(neighbors::Array{Int}; kwargs...)
+	current = neighbors[1]
+	if susceptible(current, _g)
+		if infect(count(i -> infectious(i, _g), neighbors), _g)
+			return 1
+		else
+			return 0
+		end
+	else
+		return (current + 1) % (_g.τi + _g.τr)
+	end
+end
+
+# ╔═╡ 35d0be40-66f7-11eb-2f60-01982265ccb0
+mutable struct LifeGrid <: AbstractGrid{Int}
+	state::Array{Int}
+	otherstate::Array{Int}
+	bc::BoundaryCondition
+	neighborhood::AbstractNeighborhood
+	τi::Int64
+	τr::Int64
+	max::Int64
+	function LifeGrid(
+			size::Tuple{Int,Int}, τi::Int, τr::Int;
+			max::Int64, init=nothing, 
+			nh::AbstractNeighborhood=VonNeumannNeighborhood(1, 2))
+		z = zeros(size)
+		if isnothing(init) z[(size .÷ 2)...] = 1
+		else z[rand(CartesianIndices(z), init)] .= 1
+		end
+		new(z, copy(z), FixedMax, nh, τi, τr, max)
+	end
+	function LifeGrid(
+			arr::Array{Int}, τi::Int, τr::Int;
+			max::Int64,
+			nh::AbstractNeighborhood=VonNeumannNeighborhood(1, 2)
+		)
+		new(arr, copy(arr), FixedMax, nh, τi, τr, max)
+	end
+end
+
+# ╔═╡ 21d1eb20-66f8-11eb-26d3-4fb244ca8646
+begin
+	infect(_count::Int64, g::LifeGrid) = if (_count == 0) false else rand() < 1 / g.max * _count end
+	susceptible(i::Int, g::LifeGrid) = i == 0
+	infectious(i::Int, g::LifeGrid) = i ∈ 1:g.τi
+	refactory(i::Int, g::LifeGrid) = i ∈ (g.τi + 1):(g.τr + g.τi)
+	recovered(i::Int, g::LifeGrid) = i == (g.τr + g.τi) + 1
+end
 
 # ╔═╡ Cell order:
 # ╟─9a74ef90-67ad-11eb-1fc3-e7080fbfc7e1
